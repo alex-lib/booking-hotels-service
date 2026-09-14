@@ -4,6 +4,7 @@ import com.service.bookinghotels.entities.Room;
 import com.service.bookinghotels.entities.UnavailableDate;
 import com.service.bookinghotels.exceptions.EntityNotFoundException;
 import com.service.bookinghotels.exceptions.RoomIsBusyException;
+import com.service.bookinghotels.mappers.booking.BookingMapper;
 import com.service.bookinghotels.repositories.BookingRepository;
 import com.service.bookinghotels.repositories.RoomRepository;
 import com.service.bookinghotels.services.BookingService;
@@ -11,8 +12,11 @@ import com.service.bookinghotels.services.UnavailableDateService;
 import com.service.bookinghotels.utils.BeanUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.starter.outbox.Outbox;
 import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -24,16 +28,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class BookingServiceImpl implements BookingService {
-
     private final BookingRepository bookingRepository;
-
     private final RoomRepository roomRepository;
-
     private final UnavailableDateService unavailableDateService;
+    private final Outbox outbox;
+    private final BookingMapper bookingMapper;
+
+    @Value("${app.kafka.bookingRoomTopic}")
+    private String bookingRoomTopic;
 
     @Transactional
     @Override
-    public Booking createBooking(Booking booking) {
+    public Booking createBooking(Booking booking, UserDetails user) {
         LocalDate now = LocalDate.now();
         if (booking.getCheckInDate().isBefore(now) || booking.getCheckOutDate().isBefore(now)) {
             log.error("Check-in or check-out date is before current date: {}", booking);
@@ -41,7 +47,11 @@ public class BookingServiceImpl implements BookingService {
         }
         log.info("Call method createBooking to create booking: {}", booking);
         setNewBusyDatesForRoom(booking);
-        return bookingRepository.save(booking);
+        Booking newBooking = bookingRepository.save(booking);
+
+        outbox.send(bookingRoomTopic, newBooking.getId().toString(),
+                bookingMapper.bookingToBookingRoomEvent(newBooking, user));
+        return newBooking;
     }
 
     @Transactional

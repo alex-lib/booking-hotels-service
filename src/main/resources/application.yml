@@ -23,6 +23,13 @@ spring:
     generate-ddl: true
     show-sql: true
 
+outbox:
+  poll-interval: 1s
+  batch-size: 100
+  lease: 30s
+  max-attempts: 25
+  retention: 7d
+
 app:
   security:
     type: db

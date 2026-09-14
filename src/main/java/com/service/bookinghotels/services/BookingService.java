@@ -1,10 +1,11 @@
 package com.service.bookinghotels.services;
 import com.service.bookinghotels.entities.Booking;
+import org.springframework.security.core.userdetails.UserDetails;
 import java.util.List;
 
 public interface BookingService {
 
-    Booking createBooking(Booking booking);
+    Booking createBooking(Booking booking, UserDetails user);
 
     Booking updateBooking(Long bookingId, Booking booking);
 

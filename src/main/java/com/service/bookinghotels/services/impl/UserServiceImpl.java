@@ -4,27 +4,32 @@ import com.service.bookinghotels.entities.roles.Role;
 import com.service.bookinghotels.entities.roles.RoleType;
 import com.service.bookinghotels.exceptions.EntityIsExistedException;
 import com.service.bookinghotels.exceptions.EntityNotFoundException;
+import com.service.bookinghotels.mappers.user.UserMapper;
 import com.service.bookinghotels.repositories.RoleRepository;
 import com.service.bookinghotels.repositories.UserRepository;
 import com.service.bookinghotels.services.UserService;
 import com.service.bookinghotels.utils.BeanUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.starter.outbox.Outbox;
 import java.util.Collections;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class UserServiceImpl implements UserService {
-
     private final UserRepository userRepository;
-
     private final PasswordEncoder passwordEncoder;
-
     private final RoleRepository roleRepository;
+    private final Outbox outbox;
+    private final UserMapper userMapper;
+
+    @Value("${app.kafka.registrationUserTopic}")
+    private String registrationUserTopic;
 
     @Transactional(readOnly = true)
     @Override
@@ -49,7 +54,11 @@ public class UserServiceImpl implements UserService {
         role.setUser(user);
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         roleRepository.save(role);
-        return userRepository.save(user);
+        User newUser = userRepository.save(user);
+
+        outbox.send(registrationUserTopic, newUser.getId().toString(),
+                userMapper.userToRegistrationUserEvent(newUser));
+        return newUser;
     }
 
     @Transactional

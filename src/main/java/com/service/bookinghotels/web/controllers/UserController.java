@@ -4,14 +4,11 @@ import com.service.bookinghotels.entities.User;
 import com.service.bookinghotels.entities.roles.RoleType;
 import com.service.bookinghotels.mappers.user.UserMapper;
 import com.service.bookinghotels.services.UserService;
-import com.service.bookinghotels.web.dto.kafkadto.RegistrationUserEvent;
 import com.service.bookinghotels.web.dto.user.UserRequest;
 import com.service.bookinghotels.web.dto.user.UserResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,14 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/user")
 @RequiredArgsConstructor
 public class UserController {
-
-    @Value("${app.kafka.registrationUserTopic}")
-    private String topicName;
-
-    private final KafkaTemplate<String, RegistrationUserEvent> kafkaTemplateRegistrationUserEvent;
-
     private final UserService userService;
-
     private final UserMapper userMapper;
 
     @ResponseStatus(HttpStatus.CREATED)
@@ -36,7 +26,6 @@ public class UserController {
     public UserResponse createUser(@RequestBody @Valid UserRequest userRequest,
                                    @RequestParam RoleType roleType) {
         User newUser = userService.createUser(userMapper.userRequestToUser(userRequest), roleType);
-        kafkaTemplateRegistrationUserEvent.send(topicName, userMapper.userToRegistrationUserEvent(newUser));
         return userMapper.userToUserResponse(newUser);
     }
 
